@@ -17,6 +17,7 @@ import uuid
 from pathlib import Path
 import time
 import pyttsx3 
+from googletrans import Translator
 
 nltk.download('stopwords')
 stopwords = set(nltk.corpus.stopwords.words('english'))
@@ -290,6 +291,12 @@ def talk():
             engine.say("Yikes! My circuits glitched. Let's try that again...")
             engine.runAndWait()
 
-
+async def translate_to_english(text):
+    translator = Translator()
+    detection = await translator.detect(text)  # Await the coroutine
+    if detection.lang != "en":
+        translation = await translator.translate(text, src=detection.lang, dest="en")
+        return translation.text
+    return text
 
 # talk()
