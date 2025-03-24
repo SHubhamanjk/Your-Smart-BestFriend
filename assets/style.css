@@ -1,0 +1,69 @@
+body {
+    background-color: #000000 !important;
+}
+
+.header {
+    text-align: center;
+    padding: 1rem;
+}
+
+.animated-title {
+    animation: bounce 2s infinite;
+    color: #BB86FC !important;
+    font-family: 'Arial Black', sans-serif;
+}
+
+@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.message-bubble {
+    max-width: 70%;
+    padding: 1rem;
+    border-radius: 1.5rem;
+    margin: 0.5rem 0;
+}
+
+.ai-message {
+    display: flex;
+    justify-content: flex-start;
+}
+
+.user-message {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.ai {
+    background-color: #3700B3;
+    color: white;
+}
+
+.user {
+    background-color: #03DAC6;
+    color: black;
+}
+
+div.stAudioRecorder {
+    margin: 0 auto;
+}
+
+button[title="Start recording"] {
+    background-color: #03DAC6 !important;
+}
+
+.flet-dropdown {
+    background-color: #3700B3 !important;
+    color: white !important;
+    border-radius: 15px !important;
+    padding: 8px !important;
+}
+
+.flet-slider {
+    accent-color: #03DAC6 !important;
+}
+
+.flet-slider-container {
+    padding: 0 15px !important;
+}
