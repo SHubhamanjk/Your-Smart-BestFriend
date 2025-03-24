@@ -2,6 +2,8 @@ import flet as ft
 import random
 import time
 import threading
+import uuid
+from pathlib import Path
 from functions import *
 
 # ========== UI Configuration ==========
@@ -18,6 +20,13 @@ class AppState:
         self.chat_history = ft.ListView()
         self.active_thread = None
         self.audio_player = None
+        self.exit_flag = False
+
+# ========== Utility Functions ==========
+def get_temp_file(extension=".mp3"):
+    temp_dir = Path.cwd() / "temp"
+    temp_dir.mkdir(exist_ok=True)
+    return temp_dir / f"{uuid.uuid4().hex}{extension}"
 
 # ========== Main App ==========
 def main(page: ft.Page):
@@ -33,7 +42,7 @@ def main(page: ft.Page):
         size=20,
         color=PRIMARY_COLOR,
         weight=ft.FontWeight.BOLD,
-        animate_scale=ft.animation.Animation(1000, "bounceOut"),
+        animate_rotation=ft.animation.Animation(300, "bounceOut"),
     )
 
     gif = ft.Image(
@@ -60,12 +69,20 @@ def main(page: ft.Page):
         icon_color=SECONDARY_COLOR,
         items=[
             ft.PopupMenuItem(
-                text="Change Voice",
-                on_click=lambda e: change_voice(page, state)
+                text="English Voice",
+                on_click=lambda e: change_voice("en", page, state)
             ),
             ft.PopupMenuItem(
-                text="Volume Settings",
-                on_click=lambda e: change_volume_mode(page, state)
+                text="Hindi Voice",
+                on_click=lambda e: change_voice("hi", page, state)
+            ),
+            ft.PopupMenuItem(
+                text="Speaker Mode",
+                on_click=lambda e: change_volume_mode("speaker", page, state)
+            ),
+            ft.PopupMenuItem(
+                text="Headphone Mode",
+                on_click=lambda e: change_volume_mode("headphone", page, state)
             ),
         ],
     )
@@ -86,7 +103,6 @@ def main(page: ft.Page):
                         ft.Row(
                             [close_btn, ft.Container(expand=True), voice_toggle, settings_menu],
                             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                            vertical_alignment=ft.CrossAxisAlignment.END,
                         ),
                     ],
                     expand=True,
@@ -98,11 +114,18 @@ def main(page: ft.Page):
 
     # ========== Startup Greeting ==========
     def initial_greeting():
+        if state.exit_flag: return
+        
         greetings = [
             "Hey there! How can I help you today?",
             "Hello friend! What's on your mind?",
             "Hi! Ready to chat?",
             "Good to see you! How can I assist?",
+            "Hey buddy! Long time no chat... How's life treating you?",
+            "Yo! What's up? Ready for our daily dose of real talk?",
+            "Namaste dost! Kaise ho aaj? Let's vibe together...",
+            "Ah, my favorite human! What's cooking in that beautiful mind today?",
+            "Hey partner in crime! Ready to unpack some thoughts?"
         ]
         response = random.choice(greetings)
         add_message(response, "ai", state)
@@ -135,14 +158,16 @@ def speak(text, page, state):
             src=audio_file,
             autoplay=True,
             volume=1.0 if state.volume_mode == "speaker" else 0.5,
-            on_loaded=lambda _: threading.Thread(
-                target=cleanup_audio_file,
-                args=(audio_file,),
-                daemon=True
-            ).start()
         )
         page.overlay.append(state.audio_player)
         page.update()
+        
+        # Cleanup audio file after playback
+        threading.Thread(
+            target=cleanup_audio_file,
+            args=(audio_file,),
+            daemon=True
+        ).start()
         
     except Exception as e:
         print(f"Error in speak: {str(e)}")
@@ -153,6 +178,7 @@ def cleanup_audio_file(file_path):
         Path(file_path).unlink(missing_ok=True)
     except Exception as e:
         print(f"Error cleaning up audio file: {str(e)}")
+
 def toggle_listening(e, state, page):
     state.listening = not state.listening
     e.control.icon = ft.icons.MIC if state.listening else ft.icons.MIC_OFF
@@ -167,7 +193,7 @@ def toggle_listening(e, state, page):
         state.active_thread.start()
 
 def continuous_listening(page, state):
-    while state.listening:
+    while state.listening and not state.exit_flag:
         try:
             user_input = speech_to_text()
             if user_input and user_input.lower() not in ["no speech detected", "error"]:
@@ -183,25 +209,26 @@ def continuous_listening(page, state):
             state.listening = False
             page.update()
 
-def change_voice(page, state):
-    state.current_voice = "hi" if state.current_voice == "en" else "en"
+def change_voice(lang, page, state):
+    state.current_voice = lang
     page.snack_bar = ft.SnackBar(
-        content=ft.Text(f"Voice changed to {state.current_voice.upper()}"),
+        content=ft.Text(f"Voice changed to {lang.upper()}"),
         bgcolor=PRIMARY_COLOR
     )
     page.snack_bar.open = True
     page.update()
 
-def change_volume_mode(page, state):
-    state.volume_mode = "headphone" if state.volume_mode == "speaker" else "speaker"
+def change_volume_mode(mode, page, state):
+    state.volume_mode = mode
     page.snack_bar = ft.SnackBar(
-        content=ft.Text(f"Volume mode: {state.volume_mode.capitalize()}"),
+        content=ft.Text(f"Volume mode: {mode.capitalize()}"),
         bgcolor=PRIMARY_COLOR
     )
     page.snack_bar.open = True
     page.update()
 
 def exit_app(page, state):
+    state.exit_flag = True
     state.listening = False
     if state.active_thread and state.active_thread.is_alive():
         state.active_thread.join(timeout=2)
@@ -210,6 +237,11 @@ def exit_app(page, state):
         "See you soon! Take care!",
         "Goodbye! Remember to smile!",
         "Until next time! Stay awesome!",
+        "Catch you later, partner! Remember: You're stronger than you think.",
+        "Alright, time to bounce... But I'm always here if you need!",
+        "Chalo, phir milenge! Take care of yourself, yaar.",
+        "Signing off for now... Don't forget to hydrate!",
+        "Peace out! You've got this – whatever 'this' is today."
     ]
     farewell = random.choice(goodbyes)
     speak(farewell, page, state)
