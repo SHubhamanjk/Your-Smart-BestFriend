@@ -17,7 +17,21 @@ import uuid
 from pathlib import Path
 import time
 import pyttsx3 
+import pyautogui
+import webbrowser
+import time
+import pywhatkit
 from googletrans import Translator
+
+from langchain.agents import AgentType, initialize_agent
+from langchain_community.tools import DuckDuckGoSearchRun,WikipediaQueryRun
+from langchain_community.utilities import DuckDuckGoSearchAPIWrapper, WikipediaAPIWrapper
+
+agent_memory=ConversationBufferMemory(memory_key="agent_chat_history",return_messages=True)
+
+import warnings
+warnings.filterwarnings("ignore")
+
 
 nltk.download('stopwords')
 stopwords = set(nltk.corpus.stopwords.words('english'))
@@ -63,6 +77,11 @@ memory = ConversationBufferMemory(
 
 llm = ChatGroq(api_key=groq_api_key, model_name="gemma2-9b-it")
 
+search_wrapper = DuckDuckGoSearchAPIWrapper(max_results=1)
+wiki_wrapper = WikipediaAPIWrapper(max_results=1)
+search = DuckDuckGoSearchRun(api_wrapper=search_wrapper)
+wiki=WikipediaQueryRun(api_wrapper=wiki_wrapper)
+
 mental_health_prompt = PromptTemplate(
     input_variables=["chat_history", "user_input", "user_mood"],
     template="""
@@ -99,6 +118,41 @@ llm_chain = LLMChain(
     prompt=mental_health_prompt,
     verbose=False
 )
+
+
+def remove_formatting(text: str) -> str:
+    text = re.sub(r'\*|\_|\~|\`|\>','', text)
+    text = re.sub(r'[\n\t\r]', ' ', text)
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
+
+agent = initialize_agent(
+    tools=[search,wiki],
+    llm=llm,
+    agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
+    verbose=True,
+    memory=memory,
+    agent_executor_kwargs={"prompt": mental_health_prompt},
+    handle_parsing_errors=True
+)
+
+def advance_search(input_text):
+    if not input_text.strip():
+        return "Please ask something specific for advanced search"
+
+    keywords=["hey", "please","ok", "hello", "hi", "assistant", "buddy", "friend", "thanks", "thank you", "", "help"]
+    for keyword in keywords:
+        if keyword in input_text:
+            input_text=input_text.replace(keyword, "") 
+    result = agent.run(input_text)
+    result = remove_formatting(result)
+    print(result)
+    return result    
+
+
+
+
 
 def clean_response(response_text: str):
     """Remove any AI prefixes from response"""
@@ -220,14 +274,12 @@ def text_to_speech(text, lang='en', gender='male', speed=180):
 def talk():
     """Voice-based conversation system with emotional intelligence"""
     
-    # Initialize TTS engine first to catch errors early
     try:
         engine = pyttsx3.init()
     except Exception as e:
         print(f"Failed to initialize TTS engine: {str(e)}")
         return
 
-    # Greeting templates
     GREETINGS = [
         "Hey buddy! Long time no chat... How's life treating you?",
         "Yo! What's up? Ready for our daily dose of real talk?",
@@ -236,7 +288,6 @@ def talk():
         "Hey partner in crime! Ready to unpack some thoughts?"
     ]
     
-    # Farewell templates
     GOODBYES = [
         "Catch you later, partner! Remember: You're stronger than you think.",
         "Alright, time to bounce... But I'm always here if you need!",
@@ -245,15 +296,13 @@ def talk():
         "Peace out! You've got this – whatever 'this' is today."
     ]
 
-    # Random greeting selection
     import random
     greeting = random.choice(GREETINGS)
     engine.say(greeting)
-    engine.runAndWait()  # This blocks until speech is done
+    engine.runAndWait() 
     
     while True:
         try:
-            # Get voice input
             print("\n" + "="*40 + "\nListening... (Say 'bye' to exit)")
             user_speech = speech_to_text()
             
@@ -262,23 +311,19 @@ def talk():
                 engine.runAndWait()
                 continue
                 
-            # Check for exit conditions
             if any(word in user_speech.lower() for word in ['bye', 'stop', 'quit', 'enough']):
                 farewell = random.choice(GOODBYES)
                 engine.say(farewell)
                 engine.runAndWait()
                 break
                 
-            # Process input
             print(f"\nUser said: {user_speech}")
             mood = predict_emotion(user_speech)
             print(f"Detected mood: {mood}")
             
-            # Generate response
             ai_response = get_ai_response(user_speech, mood)
             print(f"\nAI Response: {ai_response}")
             
-            # Convert response to speech
             engine.say(ai_response)
             engine.runAndWait()
             
@@ -293,10 +338,62 @@ def talk():
 
 async def translate_to_english(text):
     translator = Translator()
-    detection = await translator.detect(text)  # Await the coroutine
+    detection = await translator.detect(text) 
     if detection.lang != "en":
         translation = await translator.translate(text, src=detection.lang, dest="en")
         return translation.text
     return text
 
-# talk()
+
+def automation_work(input_text):
+    
+    if "and" not in input_text:
+        if "open" in input_text:
+            try:
+                input_text = input_text.lower()
+                input_text=input_text.replace("open", "")
+                keywords=["hey", "please", "ok", "hello", "hi", "assistant", "buddy", "friend", "thanks", "thank you", "", "help"]
+                for keyword in keywords:
+                    if keyword in input_text:
+                        input_text=input_text.replace(keyword, "")
+                pyautogui.press("super")  
+                time.sleep(3)
+                pyautogui.write(input_text)
+                time.sleep(3)
+                pyautogui.press("enter")
+                return f"Opening {input_text}"
+            except Exception as e:
+                print(f"Automation error: {str(e)}")
+                return "Sorry, I couldn't complete that action"
+
+        elif "close" in input_text:
+            try:
+                input_text=input_text.replace("close", "")
+                keywords=["hey", "please", "ok", "hello", "hi", "assistant", "buddy", "friend", "thanks", "thank you", "", "help"]
+                for keyword in keywords:
+                    if keyword in input_text:
+                        input_text=input_text.replace(keyword, "")
+                pyautogui.press("alt")
+                pyautogui.press("f4")
+                return f"Closing {input_text}"
+            except Exception as e:
+                print(f"Automation error: {str(e)}")
+                return "Sorry, I couldn't complete that action"
+            
+        elif "play" in input_text:
+            try:
+                input_text=input_text.replace("play", "")
+                keywords=["hey", "please","ok", "hello", "hi", "assistant", "buddy", "friend", "thanks", "thank you", "", "help"]
+                for keyword in keywords:
+                    if keyword in input_text:
+                        input_text=input_text.replace(keyword, "")
+                pywhatkit.playonyt(input_text)
+                return f"Playing {input_text}"
+            except Exception as e:
+                print(f"Automation error: {str(e)}")
+                return "Sorry, I couldn't complete that action"         
+            
+    else:
+        return "working on it"    
+
+
